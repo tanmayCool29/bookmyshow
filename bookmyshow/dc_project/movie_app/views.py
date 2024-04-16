@@ -12,26 +12,34 @@ import numpy as np
 import json
 from modernrpc.views import RPCEntryPoint
 import http.client
-from threading import Thread,Semaphore
+from threading import Thread,Semaphore,Lock
 import ntplib
 import time
 
+clock = 0
+clock_lock = Lock()
+
 def synchronize_clock():
+    global clock
     try:
         # Create an NTP client instance
         client = ntplib.NTPClient()
         # Query an NTP server for the current time
         response = client.request('pool.ntp.org')
-        # Set the system time using the received NTP timestamp
-        ntp_time = response.tx_time
-        # Set system time
-        time_set = time.time()
-        time_diff = ntp_time - time_set
-        time_new = time.time() + time_diff
-        time_set = time_new
-        print(f"Clock synchronized to {time.ctime(time_new)}")
+        # Get the server's timestamp
+        server_time = response.tx_time
+        # Update the local clock using Lamport's algorithm
+        update_clock(server_time)
+        print(f"Clock synchronized to {time.ctime(clock)}")
     except Exception as e:
         print(f"Failed to synchronize clock: {e}")
+
+def update_clock(server_time):
+    global clock
+    with clock_lock:
+        # Update the local clock to the maximum value between
+        # the current local time and the received server time
+        clock = max(clock, server_time) + 1\
 
 
 
