@@ -7,14 +7,12 @@ from django.db import IntegrityError
 from django.urls import reverse
 from .models import *
 from django.contrib.auth.hashers import make_password
-import speech_recognition as sr
 from datetime import datetime
-from openai import OpenAI
 import numpy as np
 import json
 from modernrpc.views import RPCEntryPoint
 import http.client
-from threading import Thread
+from threading import Thread,Semaphore
 
 
 def fetch_theaters_api():
@@ -139,6 +137,10 @@ def fetch_theater_data(theater, movies_with_name, theater_data):
         'tid': theater.tid,
         'show_times': theater_show_times,
     })
+
+MAX_THREADS = 5  # Adjust this value according to your requirements
+semaphore = Semaphore(MAX_THREADS)
+
 def movie_theaters(request):
     if request.method == 'POST':
         movie_name = request.POST.get('movie_name')
@@ -173,6 +175,42 @@ def movie_theaters(request):
                 movies_data.append([mov.movie_name, mov.duration, mov.image_url])
 
         return render(request, 'index.html', {"movies_data": movies_data})
+
+
+# def movie_theaters(request):
+#     if request.method == 'POST':
+#         movie_name = request.POST.get('movie_name')
+#         movies_with_name = Movies.objects.filter(movie_name=movie_name)
+#         theater_ids = set(movie.theater_id for movie in movies_with_name)
+#         theaters_with_movie = Theaters.objects.filter(theater_id__in=theater_ids)
+# 
+#         theater_data = []
+#         threads = []
+# 
+#         for theater in theaters_with_movie:
+#             # Create and start a new Thread for each theater data fetching
+#             thread = Thread(target=fetch_theater_data, args=(theater, movies_with_name, theater_data))
+#             threads.append(thread)
+#             thread.start()
+# 
+#         # Wait for all threads to complete
+#         for thread in threads:
+#             thread.join()
+# 
+#         print(theater_data)  # For debugging purposes
+# 
+#         return render(request, 'theaters.html', {'theater_data': theater_data, 'movie_name': movie_name})
+#     else:
+#         movies = Movies.objects.all()
+#         unique_movies_name = []
+#         movies_data = []
+# 
+#         for mov in movies:
+#             if mov.movie_name not in unique_movies_name:
+#                 unique_movies_name.append(mov.movie_name)
+#                 movies_data.append([mov.movie_name, mov.duration, mov.image_url])
+# 
+#         return render(request, 'index.html', {"movies_data": movies_data})
 
 
 # def movie_theaters(request):
