@@ -13,9 +13,31 @@ import json
 from modernrpc.views import RPCEntryPoint
 import http.client
 from threading import Thread,Semaphore
+import ntplib
+import time
+
+def synchronize_clock():
+    try:
+        # Create an NTP client instance
+        client = ntplib.NTPClient()
+        # Query an NTP server for the current time
+        response = client.request('pool.ntp.org')
+        # Set the system time using the received NTP timestamp
+        ntp_time = response.tx_time
+        # Set system time
+        time_set = time.time()
+        time_diff = ntp_time - time_set
+        time_new = time.time() + time_diff
+        time_set = time_new
+        print(f"Clock synchronized to {time.ctime(time_new)}")
+    except Exception as e:
+        print(f"Failed to synchronize clock: {e}")
+
+
 
 
 def fetch_theaters_api():
+    synchronize_clock()
     conn = http.client.HTTPSConnection("flixster.p.rapidapi.com")
 
     headers = {
@@ -48,6 +70,7 @@ def fetch_theaters_api():
 
 
 def fetch_movies_api():
+    synchronize_clock()
     theaters = Theaters.objects.all()
 
     for theater in theaters:
@@ -113,6 +136,7 @@ def fetch_movies_api():
 
 
 def index(request):
+    synchronize_clock()
     # theaters = Theaters.objects.all()
 
     movies = Movies.objects.all()
@@ -128,6 +152,7 @@ def index(request):
     })
 
 def fetch_theater_data(theater, movies_with_name, theater_data):
+    synchronize_clock()
     theater_show_times = [
         movie.show_times for movie in movies_with_name if movie.theater_id == theater.theater_id
     ]
@@ -142,6 +167,7 @@ MAX_THREADS = 5  # Adjust this value according to your requirements
 semaphore = Semaphore(MAX_THREADS)
 
 def movie_theaters(request):
+    synchronize_clock()
     if request.method == 'POST':
         movie_name = request.POST.get('movie_name')
         movies_with_name = Movies.objects.filter(movie_name=movie_name)
@@ -253,6 +279,7 @@ def movie_theaters(request):
 
 
 def movie_showtimes(request):
+    synchronize_clock()
     if request.method == 'POST':
 
         movie_name = request.POST.get('movie_name')
@@ -303,6 +330,7 @@ def movie_showtimes(request):
 
 
 def select_show(request):
+    synchronize_clock()
     if request.method == 'POST':
         theater_id = request.POST.get('theater_id')
         theater_name = request.POST.get('theater_name')
@@ -326,6 +354,7 @@ def select_show(request):
         pass
 
 def book_seats(request):
+    synchronize_clock()
     if request.method == 'POST':
         selected_seats = request.POST.getlist('selected_seats')
         theater_name = request.POST.get('theater_name')
@@ -360,6 +389,7 @@ def book_seats(request):
 
 
 def login_view(request):
+    synchronize_clock()
     if request.method == "POST":
 
         # Attempt to sign user in
@@ -380,11 +410,13 @@ def login_view(request):
 
 
 def logout_view(request):
+    synchronize_clock()
     logout(request)
     return HttpResponseRedirect(reverse("index"))
 
 
 def register(request):
+    synchronize_clock()
     if request.method == "POST":
         username = request.POST["username"]
         email = request.POST["email"]
