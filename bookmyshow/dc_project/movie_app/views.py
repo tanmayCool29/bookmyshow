@@ -278,55 +278,103 @@ def movie_theaters(request):
 #         })
 
 
+# def movie_showtimes(request):
+#     if request.method == 'POST':
+
+#         movie_name = request.POST.get('movie_name')
+#         theater_name = request.POST.get('theater_name')
+
+#         # print(movie_name)
+#         # print(theater_name)
+#         # print("\n---------------\n")
+#         # Filter Movies model to get all records with the given movie_name
+#         movies_with_name = Movies.objects.filter(movie_name=movie_name)
+
+#         # Extract unique theater_id values from the filtered Movies records
+#         theater_ids = set(movie.theater_id for movie in movies_with_name)
+
+#         # Filter Theaters model using the extracted theater_id values
+#         theaters_with_movie = Theaters.objects.filter(theater_id__in=theater_ids)
+
+#         # Create a data structure that contains the required information
+#         theater_data = []
+#         for theater in theaters_with_movie:
+#             theater_show_times = [movie.show_times for movie in movies_with_name if
+#                                   movie.theater_id == theater.theater_id]
+#             # print(f"1: {theater_name}, 2: {theater.theater_name}\n")
+#             if theater_name == theater.theater_name:
+#                 theater_data.append({
+#                     'theater_id': theater.theater_id,
+#                     'theater_name': theater.theater_name,
+#                     'tid': theater.tid,
+#                     'show_times': theater_show_times,
+#                     'movie_name': movie_name
+#                 })
+#         # print(theater_data)
+
+#         # Render the template with the theater_data
+#         return render(request, 'showtimes.html', {'theater_data': theater_data})
+#     else:
+#         # Handle the case when the request method is not POST, like displaying an error message
+#         movies = Movies.objects.all()
+#         unique_movies_name = []
+#         movies_data = []
+#         for mov in movies:
+#             if mov.movie_name not in unique_movies_name:
+#                 unique_movies_name.append(mov.movie_name)
+#                 movies_data.append([mov.movie_name, mov.duration, mov.image_url])
+#         return render(request, 'index.html', {
+#             "movies_data": movies_data
+#         })
+
+
+def process_theater(theater, movies_with_name, theater_name, movie_name, theater_data, lock):
+    theater_show_times = [movie.show_times for movie in movies_with_name if movie.theater_id == theater.theater_id]
+    if theater_name == theater.theater_name:
+        data = {
+            'theater_id': theater.theater_id,
+            'theater_name': theater.theater_name,
+            'tid': theater.tid,
+            'show_times': theater_show_times,
+            'movie_name': movie_name
+        }
+        with lock:
+            theater_data.append(data)
+
 def movie_showtimes(request):
     synchronize_clock()
     if request.method == 'POST':
-
         movie_name = request.POST.get('movie_name')
         theater_name = request.POST.get('theater_name')
 
-        # print(movie_name)
-        # print(theater_name)
-        # print("\n---------------\n")
-        # Filter Movies model to get all records with the given movie_name
         movies_with_name = Movies.objects.filter(movie_name=movie_name)
-
-        # Extract unique theater_id values from the filtered Movies records
         theater_ids = set(movie.theater_id for movie in movies_with_name)
-
-        # Filter Theaters model using the extracted theater_id values
         theaters_with_movie = Theaters.objects.filter(theater_id__in=theater_ids)
 
-        # Create a data structure that contains the required information
         theater_data = []
-        for theater in theaters_with_movie:
-            theater_show_times = [movie.show_times for movie in movies_with_name if
-                                  movie.theater_id == theater.theater_id]
-            # print(f"1: {theater_name}, 2: {theater.theater_name}\n")
-            if theater_name == theater.theater_name:
-                theater_data.append({
-                    'theater_id': theater.theater_id,
-                    'theater_name': theater.theater_name,
-                    'tid': theater.tid,
-                    'show_times': theater_show_times,
-                    'movie_name': movie_name
-                })
-        # print(theater_data)
+        lock = Lock()
+        threads = []
 
-        # Render the template with the theater_data
+        for theater in theaters_with_movie:
+            thread = Thread(target=process_theater, args=(theater, movies_with_name, theater_name, movie_name, theater_data, lock))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
         return render(request, 'showtimes.html', {'theater_data': theater_data})
     else:
-        # Handle the case when the request method is not POST, like displaying an error message
         movies = Movies.objects.all()
         unique_movies_name = []
         movies_data = []
+
         for mov in movies:
             if mov.movie_name not in unique_movies_name:
                 unique_movies_name.append(mov.movie_name)
                 movies_data.append([mov.movie_name, mov.duration, mov.image_url])
-        return render(request, 'index.html', {
-            "movies_data": movies_data
-        })
+
+        return render(request, 'index.html', {"movies_data": movies_data})
 
 
 def select_show(request):
